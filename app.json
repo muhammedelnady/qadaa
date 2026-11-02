@@ -15,7 +15,11 @@
       "supportsTablet": true,
       "icon": "./assets/AppIcon.icon",
       "infoPlist": {
-        "UIBackgroundModes": ["remote-notification"]
+        "UIBackgroundModes": ["remote-notification"],
+        "UIApplicationSceneManifest": {
+          "UIApplicationSupportsMultipleScenes": false,
+          "UISceneConfigurations": {}
+        }
       },
       "bundleIdentifier": "com.melnady.qadaa"
     },
