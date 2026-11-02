@@ -6,6 +6,22 @@ import type React from "react";
 
 process.env["EXPO_OS"] = "ios";
 
+jest.mock("react-i18next", () => ({
+  useTranslation: () => ({
+    t: (key: string, options?: { defaultValue?: string }) => options?.defaultValue ?? key,
+    i18n: {
+      language: "ar",
+      changeLanguage: jest.fn(() => Promise.resolve()),
+      on: jest.fn(),
+      off: jest.fn(),
+    },
+  }),
+  initReactI18next: {
+    type: "3rdParty",
+    init: jest.fn(),
+  },
+}));
+
 jest.mock("@react-native-async-storage/async-storage", () => {
   const mockStorage = new Map<string, string>();
   return {

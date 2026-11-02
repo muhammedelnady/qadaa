@@ -8,14 +8,11 @@ import { asyncStorageAdapter } from "@data/storage/storage";
 import { PERSIST_VERSION, migrateToCurrent } from "./persistMigrations";
 import i18n from "@data/i18n/i18n";
 import type { Language } from "@domain/types";
-// OWNERSHIP: Settings orchestrates backup import/export across sibling stores
-// (prayer, gamification, app) via getState()/setState(). No reverse imports
-// exist — prayer/gamification/app never import settings — so no cycles.
-// This coupling is intentional: backup restore is a top-level concern.
+
 import { usePrayerStore } from "./usePrayerStore";
 import { useGamificationStore } from "./useGamificationStore";
 import { useAppStore } from "./useAppStore";
-import { generateBackupJson, parseBackupJson } from "@domain/backup";
+import { generateBackupJson, parseBackupJson, resolveBackupConflict } from "@domain/backup";
 import {
   exportToFile as backupExportToFile,
   importFromFile as backupImportFromFile,
@@ -117,47 +114,49 @@ export const useSettingsStore = create<SettingsState & SettingsActions>()(
         try {
           const parsed = parseBackupJson(json);
           if (!parsed) return false;
+          const current = get().getBackupData();
+          const target = resolveBackupConflict(current, parsed);
           useAppStore.setState({
-            wizardComplete: parsed.wizardComplete,
+            wizardComplete: target.wizardComplete,
             onboardingComplete: true,
           });
           usePrayerStore.setState({
-            age: parsed.age,
-            pubertyAge: parsed.pubertyAge,
-            periods: parsed.periods,
-            totalMissedDays: parsed.totalMissedDays,
-            prayers: parsed.prayers,
-            todayPrayers: parsed.todayPrayers,
-            todayLogPoints: parsed.todayLogPoints,
-            todayUnits: parsed.todayUnits,
-            todayDate: parsed.todayDate,
+            age: target.age,
+            pubertyAge: target.pubertyAge,
+            periods: target.periods,
+            totalMissedDays: target.totalMissedDays,
+            prayers: target.prayers,
+            todayPrayers: target.todayPrayers,
+            todayLogPoints: target.todayLogPoints,
+            todayUnits: target.todayUnits,
+            todayDate: target.todayDate,
           });
           useGamificationStore.setState({
-            streak: parsed.streak,
-            lastLogDate: parsed.lastLogDate,
-            daysLogged: parsed.daysLogged,
-            loggedDates: parsed.loggedDates,
-            points: parsed.points,
-            badges: parsed.badges,
-            graceUsedMonth: parsed.graceUsedMonth,
-            lastDuaShownDate: parsed.lastDuaShownDate,
-            intentionSetDate: parsed.intentionSetDate,
+            streak: target.streak,
+            lastLogDate: target.lastLogDate,
+            daysLogged: target.daysLogged,
+            loggedDates: target.loggedDates,
+            points: target.points,
+            badges: target.badges,
+            graceUsedMonth: target.graceUsedMonth,
+            lastDuaShownDate: target.lastDuaShownDate,
+            intentionSetDate: target.intentionSetDate,
           });
           set({
-            language: parsed.language,
-            notificationTime: parsed.notificationTime,
-            notificationPermission: parsed.notificationPermission,
-            dailyTarget: parsed.dailyTarget,
+            language: target.language,
+            notificationTime: target.notificationTime,
+            notificationPermission: target.notificationPermission,
+            dailyTarget: target.dailyTarget,
           });
-          if (parsed.language !== i18n.language) {
-            void Promise.resolve(i18n.changeLanguage(parsed.language)).catch(() => {});
+          if (target.language !== i18n.language) {
+            void Promise.resolve(i18n.changeLanguage(target.language)).catch(() => {});
           }
-          const timeParts = parsed.notificationTime?.split(":") ?? [];
+          const timeParts = target.notificationTime?.split(":") ?? [];
           const hour = Number(timeParts[0]);
           const minute = Number(timeParts[1]);
           if (
-            parsed.notificationTime &&
-            parsed.notificationPermission === "granted" &&
+            target.notificationTime &&
+            target.notificationPermission === "granted" &&
             Number.isFinite(hour) &&
             Number.isFinite(minute)
           ) {

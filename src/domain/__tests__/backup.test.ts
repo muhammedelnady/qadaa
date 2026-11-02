@@ -2,7 +2,12 @@
 /**
  * Unit tests for backup JSON generation and schema-validated parsing round-trips.
  */
-import { generateBackupJson, parseBackupJson, type BackupData } from "../backup";
+import {
+  generateBackupJson,
+  parseBackupJson,
+  resolveBackupConflict,
+  type BackupData,
+} from "../backup";
 const SAMPLE: BackupData = {
   version: 1,
   wizardComplete: true,
@@ -73,5 +78,73 @@ describe("parseBackupJson", () => {
 
   it("rejects unknown versions (schema is locked to version 1)", () => {
     expect(parseBackupJson(JSON.stringify({ ...SAMPLE, version: 2 }))).toBeNull();
+  });
+});
+
+describe("resolveBackupConflict", () => {
+  it("replaces state if totalMissedDays differs (plan changed)", () => {
+    const local = { ...SAMPLE, totalMissedDays: 365, points: 50 };
+    const incoming = { ...SAMPLE, totalMissedDays: 730, points: 10 };
+    const merged = resolveBackupConflict(local, incoming);
+    expect(merged.totalMissedDays).toBe(730);
+    expect(merged.points).toBe(10);
+  });
+
+  it("merges counters monotonically when plans match", () => {
+    const local: BackupData = {
+      ...SAMPLE,
+      prayers: {
+        fajr: { recovered: 10 },
+        dhuhr: { recovered: 5 },
+        asr: { recovered: 0 },
+        maghrib: { recovered: 0 },
+        isha: { recovered: 0 },
+      },
+      points: 100,
+      streak: 5,
+      daysLogged: 5,
+      loggedDates: ["2026-01-01", "2026-01-02"],
+      badges: [{ id: "b1", unlockedAt: 200 }],
+    };
+    const incoming: BackupData = {
+      ...SAMPLE,
+      prayers: {
+        fajr: { recovered: 8 },
+        dhuhr: { recovered: 12 },
+        asr: { recovered: 3 },
+        maghrib: { recovered: 0 },
+        isha: { recovered: 0 },
+      },
+      points: 150,
+      streak: 3,
+      daysLogged: 6,
+      loggedDates: ["2026-01-02", "2026-01-03"],
+      badges: [
+        { id: "b1", unlockedAt: 100 },
+        { id: "b2", unlockedAt: 300 },
+      ],
+    };
+
+    const merged = resolveBackupConflict(local, incoming);
+
+    // Monotonic Max per prayer
+    expect(merged.prayers.fajr.recovered).toBe(10);
+    expect(merged.prayers.dhuhr.recovered).toBe(12);
+    expect(merged.prayers.asr.recovered).toBe(3);
+
+    // Monotonic Max on points and streak
+    expect(merged.points).toBe(150);
+    expect(merged.streak).toBe(5);
+
+    // Set union on logged dates
+    expect(merged.loggedDates).toEqual(["2026-01-01", "2026-01-02", "2026-01-03"]);
+
+    // Set union on badges with earliest unlock timestamp
+    expect(merged.badges).toEqual(
+      expect.arrayContaining([
+        { id: "b1", unlockedAt: 100 },
+        { id: "b2", unlockedAt: 300 },
+      ])
+    );
   });
 });

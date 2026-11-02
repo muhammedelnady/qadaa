@@ -102,9 +102,12 @@ describe("data/backup", () => {
   it("copyToClipboard handles errors safely", async () => {
     const error = new Error("Clipboard error");
     mockedSetString.mockRejectedValueOnce(error);
+    const consoleSpy = jest.spyOn(console, "error").mockImplementation(() => {});
 
     // Test that copyToClipboard resolves and doesn't throw the error
     await expect(copyToClipboard("data")).resolves.toBeUndefined();
     expect(mockedSetString).toHaveBeenCalledWith("data");
+    expect(consoleSpy).toHaveBeenCalledWith("Failed to copy to clipboard", error);
+    consoleSpy.mockRestore();
   });
 });
