@@ -13,7 +13,7 @@ import {
 import { StatusBar } from "expo-status-bar";
 import * as SplashScreen from "expo-splash-screen";
 import { useFonts } from "expo-font";
-import { DevSettings, I18nManager, View } from "react-native";
+import { DevSettings, I18nManager, LogBox, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
@@ -38,6 +38,13 @@ import TajawalMedium from "../assets/fonts/tajawal/Tajawal-Medium.ttf";
 import TajawalBold from "../assets/fonts/tajawal/Tajawal-Bold.ttf";
 
 I18nManager.allowRTL(true);
+
+LogBox.ignoreLogs([
+  // expo-notifications checks remote push registration on startup via Keychain.
+  // In local/offline-first apps and simulators without code-signing entitlements,
+  // this is a benign expected failure that does not impact local notifications.
+  "[expo-notifications] Error reading persisted server registration info",
+]);
 
 installDefaultTextFonts();
 
